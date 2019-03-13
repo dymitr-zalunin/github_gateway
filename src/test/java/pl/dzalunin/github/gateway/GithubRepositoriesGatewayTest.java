@@ -42,14 +42,14 @@ public class GithubRepositoriesGatewayTest {
     @DataProvider
     public Object[][] repositoriesProvider() {
         return new Object[][]{
-                {"/lkishalmi/gradle-gatling-plugin", "{\n" +
+                {"lkishalmi/gradle-gatling-plugin", "{\n" +
                         "  \"fullName\": \"/lkishalmi/gradle-gatling-plugin\",\n" +
                         "  \"description\": \"Gatling Plugin for Gradle\",\n" +
                         "  \"cloneUrl\": \"https://github.com/lkishalmi/gradle-gatling-plugin.gi\",\n" +
                         "  \"stars\": 110,\n" +
                         "  \"createdAt\": \"2015-12-08T09:44:22Z\"\n" +
                         "}"},
-                {"/renatoathaydes/rawhttp", "{\n" +
+                {"renatoathaydes/rawhttp", "{\n" +
                         "  \"fullName\": \"renatoathaydes/rawhttp\",\n" +
                         "  \"description\": \"HTTP library to make it easy to deal with raw HTTP.\",\n" +
                         "  \"cloneUrl\": \"https://github.com/renatoathaydes/rawhttp.git\",\n" +
@@ -90,6 +90,23 @@ public class GithubRepositoriesGatewayTest {
         RawHttpResponse<?> response = rawHttp.parseResponse(socket.getInputStream());
 
         Assert.assertEquals(response.getStatusCode(), 501);
+        Assert.assertEquals(response.getHeaders().get("Content-Type").size(), 1);
+        Assert.assertEquals(response.getHeaders().get("Content-Type").get(0), "plain/text");
+        socket.close();
+    }
+
+    @Test
+    public void testGetRepositoriesInfoNotFound() throws IOException {
+        RawHttp rawHttp = new RawHttp();
+
+        String request = String.format(REQUEST_PATTERN, "not_existing_user/not_existing_user", port);
+
+        RawHttpRequest httpRequest = rawHttp.parseRequest(request);
+        Socket socket = new Socket("localhost", port);
+        httpRequest.writeTo(socket.getOutputStream());
+        RawHttpResponse<?> response = rawHttp.parseResponse(socket.getInputStream());
+
+        Assert.assertEquals(response.getStatusCode(), 404);
         Assert.assertEquals(response.getHeaders().get("Content-Type").size(), 1);
         Assert.assertEquals(response.getHeaders().get("Content-Type").get(0), "plain/text");
         socket.close();
