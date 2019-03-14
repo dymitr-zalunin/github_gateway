@@ -1,5 +1,6 @@
 package pl.dzalunin.github.gateway;
 
+import pl.dzalunin.github.utils.Logger;
 import rawhttp.core.RawHttp;
 import rawhttp.core.RawHttpRequest;
 import rawhttp.core.body.StringBody;
@@ -28,41 +29,56 @@ public class GithubRepositoriesGateway {
 
         executorService.submit(() -> {
                     while (!stop) {
+                        Socket socket = null;
                         try {
-                            Socket socket = serverSocket.accept();
-
-                            RawHttpRequest httpRequest = rawHttp.parseRequest(socket.getInputStream());
-
-                            if (match(httpRequest.getMethod(), httpRequest.getUri().getPath())) {
-
-                                String body = null;
+                            socket = serverSocket.accept();
+                            socket.setSoTimeout(5000);
+                            final Socket newSocket = socket;
+                            executorService.submit(() -> {
+                                RawHttpRequest httpRequest = null;
                                 try {
-                                    body = githubService.getRepositoryInfoJson(parseQuery(httpRequest.getUri().getPath()));
+                                    Logger.log("accepted new connection from: " + newSocket.getInetAddress().getHostAddress());
+                                    httpRequest = rawHttp.parseRequest(newSocket.getInputStream());
+                                    Logger.log("incoming request: " + httpRequest.toString());
 
-                                    rawHttp.parseResponse("HTTP/1.1 200 OK\r\n" +
-                                            "Content-Type: application/json"
-                                    ).withBody(
-                                            new StringBody(body)
-                                    ).writeTo(socket.getOutputStream());
+                                    if (match(httpRequest.getMethod(), httpRequest.getUri().getPath())) {
 
-                                } catch (RepositoryNotFoundException e) {
-                                    rawHttp.parseResponse("HTTP/1.1 404 Not Found\r\n" +
-                                            "Content-Type: plain/text"
-                                    ).writeTo(socket.getOutputStream());
-                                } catch (ServiceUnavailableException e) {
-                                    rawHttp.parseResponse("HTTP/1.1 503 Service Unavailable\n\r\n" +
-                                            "Content-Type: plain/text"
-                                    ).writeTo(socket.getOutputStream());
+                                        String body = null;
+                                        try {
+                                            body = githubService.getRepositoryInfoJson(parseQuery(httpRequest.getUri().getPath()));
+                                            rawHttp.parseResponse("HTTP/1.1 200 OK\r\n" +
+                                                    "Content-Type: application/json"
+                                            ).withBody(
+                                                    new StringBody(body)
+                                            ).writeTo(newSocket.getOutputStream());
+                                        } catch (RepositoryNotFoundException e) {
+                                            rawHttp.parseResponse("HTTP/1.1 404 Not Found\r\n" +
+                                                    "Content-Type: plain/text"
+                                            ).withBody(new StringBody("{}")).writeTo(newSocket.getOutputStream());
+                                        } catch (ServiceUnavailableException e) {
+                                            rawHttp.parseResponse("HTTP/1.1 503 Service Unavailable\n\r\n" +
+                                                    "Content-Type: plain/text"
+                                            ).withBody(new StringBody("{}")).writeTo(newSocket.getOutputStream());
+                                        }
+                                    } else {
+                                        rawHttp.parseResponse("HTTP/1.1 501 Not Implemented\r\n" +
+                                                "Content-Type: plain/text"
+                                        ).withBody(new StringBody("{}")).writeTo(newSocket.getOutputStream());
+                                    }
+                                    newSocket.close();
+                                } catch (IOException e) {
+                                    e.printStackTrace();
                                 }
-                            } else {
-                                rawHttp.parseResponse("HTTP/1.1 501 Method Not Implemented\r\n" +
-                                        "Content-Type: plain/text"
-                                )
-                                        .writeTo(socket.getOutputStream());
-                            }
+                            });
                         } catch (IOException e) {
-                            e.printStackTrace();
-                            break;
+                            Logger.logStackTrace(e);
+                            if (socket != null) {
+                                try {
+                                    socket.close();
+                                } catch (IOException e1) {
+                                    Logger.logStackTrace(e);
+                                }
+                            }
                         }
                     }
                 }
@@ -87,5 +103,26 @@ public class GithubRepositoriesGateway {
     static GithubService.RepositoryQuery parseQuery(String url) {
         String parts[] = url.split("/");
         return new GithubService.RepositoryQuery(parts[2], parts[3]);
+    }
+
+    public static void main(String[] args) throws IOException {
+        Logger.log("Starting server");
+        ServerSocket serverSocket = new ServerSocket(8080);
+        GithubRepositoriesGateway githubRepositoriesGateway = new GithubRepositoriesGateway(serverSocket);
+        githubRepositoriesGateway.run();
+
+        Logger.log("Server listening on port 8080");
+        Runtime.getRuntime().addShutdownHook(new Thread(new Runnable() {
+            @Override
+            public void run() {
+                Logger.log("Server shutdown");
+                githubRepositoriesGateway.stop();
+                try {
+                    serverSocket.close();
+                } catch (IOException e) {
+                    Logger.logStackTrace(e);
+                }
+            }
+        }));
     }
 }

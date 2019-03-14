@@ -92,6 +92,7 @@ public class GithubRepositoriesGatewayTest {
         Assert.assertEquals(response.getStatusCode(), 501);
         Assert.assertEquals(response.getHeaders().get("Content-Type").size(), 1);
         Assert.assertEquals(response.getHeaders().get("Content-Type").get(0), "plain/text");
+        Assert.assertEquals(response.eagerly().getBody().get().toString(), "{}");
         socket.close();
     }
 
@@ -109,6 +110,8 @@ public class GithubRepositoriesGatewayTest {
         Assert.assertEquals(response.getStatusCode(), 404);
         Assert.assertEquals(response.getHeaders().get("Content-Type").size(), 1);
         Assert.assertEquals(response.getHeaders().get("Content-Type").get(0), "plain/text");
+        Assert.assertEquals(response.eagerly().getBody().get().toString(), "{}");
+
         socket.close();
     }
 
