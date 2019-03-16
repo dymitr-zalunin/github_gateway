@@ -1,17 +1,22 @@
 package pl.dzalunin.github.gateway;
 
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 import rawhttp.core.EagerHttpResponse;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.net.URISyntaxException;
-import java.util.Optional;
+import java.net.Socket;
+import java.net.SocketException;
 
-import static org.testng.Assert.*;
+import static org.mockito.Mockito.*;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 
 public class GithubRequestSenderTest {
 
-    private final static String RAWHTTP_REPO_RESPONSE = "{\n" +
+    private final static String RAWHTTP_200_REPO_RESPONSE = "{\n" +
             "  \"id\": 112115759,\n" +
             "  \"node_id\": \"MDEwOlJlcG9zaXRvcnkxMTIxMTU3NTk=\",\n" +
             "  \"name\": \"rawhttp\",\n" +
@@ -113,24 +118,93 @@ public class GithubRequestSenderTest {
             "  \"subscribers_count\": 7\n" +
             "}\n";
 
-    @Test
-    public void testGetRepositoryInfoSuccess() throws IOException {
-        GithubRequestSender githubRequestSender = new GithubRequestSender();
+    public static final String GITHUB_API_200_RESPONSE = "HTTP/1.1 200 OK\n" +
+            "Server: GitHub.com\n" +
+            "Date: Sat, 16 Mar 2019 12:44:01 GMT\n" +
+            "Content-Type: application/json; charset=utf-8\n" +
+            "Status: 200 OK\n" +
+            "X-RateLimit-Limit: 60\n" +
+            "X-RateLimit-Remaining: 51\n" +
+            "X-RateLimit-Reset: 1552742783\n" +
+            "Cache-Control: public, max-age=60, s-maxage=60\n" +
+            "Vary: Accept\n" +
+            "ETag: W/\"b98ebb6a339343c4a194f66b1ff0b05d\"\n" +
+            "Last-Modified: Fri, 08 Mar 2019 13:20:28 GMT\n" +
+            "X-GitHub-Media-Type: unknown, github.v3\n" +
+            "Access-Control-Expose-Headers: ETag, Link, Location, Retry-After, X-GitHub-OTP, X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset, X-OAuth-Scopes, X-Accepted-OAuth-Scopes, X-Poll-Interval, X-GitHub-Media-Type\n" +
+            "Access-Control-Allow-Origin: *\n" +
+            "Strict-Transport-Security: max-age=31536000; includeSubdomains; preload\n" +
+            "X-Frame-Options: deny\n" +
+            "X-Content-Type-Options: nosniff\n" +
+            "X-XSS-Protection: 1; mode=block\n" +
+            "Referrer-Policy: origin-when-cross-origin, strict-origin-when-cross-origin\n" +
+            "Content-Security-Policy: default-src 'none'\n" +
+            "Content-Encoding: gzip\n" +
+            "X-GitHub-Request-Id: 5780:04FC:126BDC7:262E929:5C8CEF87\n" +
+            "Content-Length: 5652\n\n" +
+            RAWHTTP_200_REPO_RESPONSE;
+
+    private final static String RAWHTTP_404_REPO_RESPONSE = "{\n" +
+            "  \"message\": \"Not Found\",\n" +
+            "  \"documentation_url\": \"https://developer.github.com/v3/repos/#get\"\n" +
+            "}\n";
+
+    public static final String GITHUB_API_404_RESPONSE = "HTTP/1.1 404 Not Found\n" +
+            "Server: GitHub.com\n" +
+            "Date: Sat, 16 Mar 2019 13:23:41 GMT\n" +
+            "Content-Type: application/json; charset=utf-8\n" +
+            "Status: 404 Not Found\n" +
+            "X-RateLimit-Limit: 60\n" +
+            "X-RateLimit-Remaining: 59\n" +
+            "X-RateLimit-Reset: 1552746221\n" +
+            "X-GitHub-Media-Type: unknown, github.v3\n" +
+            "Access-Control-Expose-Headers: ETag, Link, Location, Retry-After, X-GitHub-OTP, X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset, X-OAuth-Scopes, X-Accepted-OAuth-Scopes, X-Poll-Interval, X-GitHub-Media-Type\n" +
+            "Access-Control-Allow-Origin: *\n" +
+            "Strict-Transport-Security: max-age=31536000; includeSubdomains; preload\n" +
+            "X-Frame-Options: deny\n" +
+            "X-Content-Type-Options: nosniff\n" +
+            "X-XSS-Protection: 1; mode=block\n" +
+            "Referrer-Policy: origin-when-cross-origin, strict-origin-when-cross-origin\n" +
+            "Content-Security-Policy: default-src 'none'\n" +
+            "Content-Encoding: gzip\n" +
+            "X-GitHub-Request-Id: 52FB:5552:14854E8:2962BAD:5C8CF8DD\n\n" +
+            RAWHTTP_404_REPO_RESPONSE;
+
+    @DataProvider
+    public Object[][] githubApiResponseProvider() {
+        return new Object[][]{
+                {GITHUB_API_200_RESPONSE, 200, RAWHTTP_200_REPO_RESPONSE},
+                {GITHUB_API_404_RESPONSE, 404, RAWHTTP_404_REPO_RESPONSE}
+        };
+    }
+
+    @Test(dataProvider = "githubApiResponseProvider")
+    public void testGetRepositoryInfoSuccess(String rawHttpResponse, int expectedStatusCode, String expectedBody) throws IOException {
+        GithubRequestSender githubRequestSender = spy(new GithubRequestSender());
+
+        ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(rawHttpResponse.getBytes());
+        ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+
+        Socket socket = mock(Socket.class);
+        when(socket.getInputStream()).thenReturn(byteArrayInputStream);
+        when(socket.getOutputStream()).thenReturn(byteArrayOutputStream);
+        when(githubRequestSender.openSSLSocket()).thenReturn(socket);
 
         EagerHttpResponse<?> actual = githubRequestSender.getRepositoryInfo("renatoathaydes", "rawhttp");
 
-        assertEquals(actual.getStatusCode(), 200);
+        assertEquals(actual.getStatusCode(), expectedStatusCode);
         assertTrue(actual.getBody().isPresent());
-        assertEquals(actual.getBody().map(Object::toString).orElse(""), RAWHTTP_REPO_RESPONSE);
+        assertEquals(actual.getBody().map(Object::toString).orElse(""), expectedBody);
     }
 
-    @Test
-    public void testGetRepositoryInfoNotFoundError() throws IOException, URISyntaxException {
-        GithubRequestSender githubRequestSender = new GithubRequestSender();
-        EagerHttpResponse<?> actual = githubRequestSender.getRepositoryInfo("111_fake_repo_1111", "111_fake_repo_1111");
+    @Test(expectedExceptions = IOException.class)
+    public void testGetRepositoryInfoExceptionThrown() throws IOException {
+        GithubRequestSender githubRequestSender = spy(new GithubRequestSender());
 
-        assertEquals(actual.getStatusCode(), 404);
-        assertTrue(actual.getBody().isPresent());
+        Socket socket = mock(Socket.class);
+        when(socket.getOutputStream()).thenThrow(SocketException.class);
+        when(githubRequestSender.openSSLSocket()).thenReturn(socket);
+
+        githubRequestSender.getRepositoryInfo("renatoathaydes", "rawhttp");
     }
-
 }

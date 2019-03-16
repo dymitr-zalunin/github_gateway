@@ -13,6 +13,7 @@ import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
 
+@Test(groups = {"end2end"})
 public class GithubRepositoriesGatewayTest {
 
     private static final String REQUEST_PATTERN = "GET /repositories/%s HTTP/1.1\r\n" +
@@ -91,9 +92,6 @@ public class GithubRepositoriesGatewayTest {
         RawHttpResponse<?> response = rawHttp.parseResponse(socket.getInputStream());
 
         Assert.assertEquals(response.getStatusCode(), 501);
-        Assert.assertEquals(response.getHeaders().get("Content-Type").size(), 1);
-        Assert.assertEquals(response.getHeaders().get("Content-Type").get(0), "plain/text");
-        Assert.assertEquals(response.eagerly().getBody().get().toString(), "{}");
         socket.close();
     }
 

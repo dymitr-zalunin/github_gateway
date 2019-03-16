@@ -11,7 +11,7 @@ public class GithubRepositoriesGateway {
 
     private ServerSocket serverSocket;
     private ExecutorService executorService = Executors.newFixedThreadPool(10);
-    private GithubService githubService = new GithubService(GithubService.GSON);
+    private GithubService githubService = new GithubService(GithubService.GSON, new GithubRequestSender());
 
     private volatile boolean stop = false;
 
