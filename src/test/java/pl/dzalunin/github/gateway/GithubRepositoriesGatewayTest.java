@@ -43,9 +43,9 @@ public class GithubRepositoriesGatewayTest {
     public Object[][] repositoriesProvider() {
         return new Object[][]{
                 {"lkishalmi/gradle-gatling-plugin", "{\n" +
-                        "  \"fullName\": \"/lkishalmi/gradle-gatling-plugin\",\n" +
+                        "  \"fullName\": \"lkishalmi/gradle-gatling-plugin\",\n" +
                         "  \"description\": \"Gatling Plugin for Gradle\",\n" +
-                        "  \"cloneUrl\": \"https://github.com/lkishalmi/gradle-gatling-plugin.gi\",\n" +
+                        "  \"cloneUrl\": \"https://github.com/lkishalmi/gradle-gatling-plugin.git\",\n" +
                         "  \"stars\": 110,\n" +
                         "  \"createdAt\": \"2015-12-08T09:44:22Z\"\n" +
                         "}"},
@@ -75,6 +75,7 @@ public class GithubRepositoriesGatewayTest {
         Assert.assertEquals(response.getHeaders().get("Content-Type").get(0), "application/json");
         String actualJson = response.eagerly().getBody().get().toString();
         Assert.assertEquals(actualJson, expectedResponse);
+
         socket.close();
     }
 
@@ -108,29 +109,10 @@ public class GithubRepositoriesGatewayTest {
         RawHttpResponse<?> response = rawHttp.parseResponse(socket.getInputStream());
 
         Assert.assertEquals(response.getStatusCode(), 404);
-        Assert.assertEquals(response.getHeaders().get("Content-Type").size(), 1);
-        Assert.assertEquals(response.getHeaders().get("Content-Type").get(0), "plain/text");
-        Assert.assertEquals(response.eagerly().getBody().get().toString(), "{}");
+        Assert.assertEquals(response.getHeaders().get("Content-Type").size(), 0);
+        String body = response.eagerly().getBody().map(Object::toString).orElse("");
+        Assert.assertEquals(body, "");
 
         socket.close();
-    }
-
-    @DataProvider
-    private Object[][] urlsProvider() {
-        return new Object[][]{
-                {"GET", "/repositories/lkishalmi/gradle-gatling-plugin", true},
-                {"GET", "/lkishalmi", false},
-                {"GET", "/", false},
-                {"POST", "/lkishalmi/gradle-gatling-plugin", false},
-                {"PUT", "/lkishalmi", false},
-                {"HEAD", "/lkishalmi", false},
-                {"OPTIONS", "/lkishalmi", false}
-        };
-    }
-
-    @Test(dataProvider = "urlsProvider")
-    public void testMatchUri(String method, String url, boolean expected) {
-        boolean actual = GithubRepositoriesGateway.match(method, url);
-        Assert.assertEquals(actual, expected);
     }
 }
