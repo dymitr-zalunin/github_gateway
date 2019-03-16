@@ -1,0 +1,10 @@
+{
+  "simulation": "GithubGatewaySimulator",
+  "simulationId": "githubgatewaysimulator",
+  "start": 1552750484421,
+  "description": "",
+  "scenarios": ["RecordedSimulation"],
+  "assertions": [
+
+  ]
+}

@@ -35,3 +35,14 @@ tasks.register("runEnd2EndTest", Test) {
         includeGroups = ['end2end']
     }
 }
+
+tasks.withType(Jar) {
+    destinationDir = file("$rootDir/bin/libs")
+}
+
+task copyRuntimeLibs(type: Copy) {
+    into "bin/libs"
+    from configurations.runtime
+}
+
+build.dependsOn tasks.copyRuntimeLibs
